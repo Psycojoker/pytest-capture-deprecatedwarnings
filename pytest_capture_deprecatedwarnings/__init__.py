@@ -1,3 +1,4 @@
+import os
 import pytest
 
 from _pytest.recwarn import WarningsRecorder
@@ -15,6 +16,10 @@ def pytest_runtest_call(item):
         yield
 
     deprecated_warnings = [x for x in warnings_recorder.list if x._category_name in ("DeprecationWarning", "PendingDeprecationWarning")]
+
+    for i in deprecated_warnings:
+        i.item = item
+
     all_deprecated_warnings.extend(deprecated_warnings)
 
 
@@ -35,15 +40,26 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
 
         return sorted(cleaned_list, key=lambda x: (x.filename, x.lineno))
 
+    pwd = os.path.realpath(os.curdir)
+
+    def cut_path(path):
+        if path.startswith(pwd):
+            return path[len(pwd) + 1:]
+        return path
+
+    def format_test_function_location(item):
+        return "%s::%s:%s" % (item.location[0], item.location[2], item.location[1])
+
     yield
     print("")
     print("Deprecated warnings summary:")
+    print("============================")
     for warning in clean_duplicated(all_deprecated_warnings):
-        print("* %s:%s %s('%s')" % (warning.filename, warning.lineno, warning.category.__name__, warning.message))
+        print("%s\n-> %s:%s %s('%s')" % (format_test_function_location(warning.item), cut_path(warning.filename), warning.lineno, warning.category.__name__, warning.message))
 
     print("")
     print("All DeprecationWarning errors can be found in the deprecated_warnings.log file.")
 
     with open("deprecated_warnings.log", "w") as f:
         for warning in clean_duplicated(all_deprecated_warnings):
-            f.write("%s:%s %s('%s')\n" % (warning.filename, warning.lineno, warning.category.__name__, warning.message))
+            f.write("%s\n-> %s:%s %s('%s')\n" % (format_test_function_location(warning.item), cut_path(warning.filename), warning.lineno, warning.category.__name__, warning.message))
