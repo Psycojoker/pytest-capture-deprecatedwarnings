@@ -51,15 +51,20 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
         return "%s::%s:%s" % (item.location[0], item.location[2], item.location[1])
 
     yield
-    print("")
-    print("Deprecated warnings summary:")
-    print("============================")
-    for warning in clean_duplicated(all_deprecated_warnings):
-        print("%s\n-> %s:%s %s('%s')" % (format_test_function_location(warning.item), cut_path(warning.filename), warning.lineno, warning.category.__name__, warning.message))
-
-    print("")
-    print("All DeprecationWarning errors can be found in the deprecated_warnings.log file.")
-
-    with open("deprecated_warnings.log", "w") as f:
+    if all_deprecated_warnings:
+        print("")
+        print("Deprecated warnings summary:")
+        print("============================")
         for warning in clean_duplicated(all_deprecated_warnings):
-            f.write("%s\n-> %s:%s %s('%s')\n" % (format_test_function_location(warning.item), cut_path(warning.filename), warning.lineno, warning.category.__name__, warning.message))
+            print("%s\n-> %s:%s %s('%s')" % (format_test_function_location(warning.item), cut_path(warning.filename), warning.lineno, warning.category.__name__, warning.message))
+
+        print("")
+        print("All DeprecationWarning errors can be found in the deprecated_warnings.log file.")
+
+        with open("deprecated_warnings.log", "w") as f:
+            for warning in clean_duplicated(all_deprecated_warnings):
+                f.write("%s\n-> %s:%s %s('%s')\n" % (format_test_function_location(warning.item), cut_path(warning.filename), warning.lineno, warning.category.__name__, warning.message))
+    else:
+        # nothing, clear file
+        with open("deprecated_warnings.log", "w") as f:
+            f.write("")
