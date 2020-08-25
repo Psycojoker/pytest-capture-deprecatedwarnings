@@ -15,7 +15,7 @@ def pytest_runtest_call(item):
     with warnings_recorder:
         yield
 
-    deprecated_warnings = [x for x in warnings_recorder.list if x._category_name in ("DeprecationWarning", "PendingDeprecationWarning")]
+    deprecated_warnings = [x for x in warnings_recorder.list if "DeprecationWarning" in x._category_name]
 
     for i in deprecated_warnings:
         i.item = item
