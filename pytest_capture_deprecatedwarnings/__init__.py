@@ -10,6 +10,9 @@ all_deprecated_warnings = []
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_call(item):
+    """
+    Needed to grab the item.location information
+    """
     warnings_recorder = WarningsRecorder()
     warnings_recorder._module.simplefilter('once')
 
