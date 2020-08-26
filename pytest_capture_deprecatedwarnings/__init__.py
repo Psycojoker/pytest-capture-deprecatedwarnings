@@ -62,7 +62,9 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
 
     def cut_path(path):
         if path.startswith(pwd):
-            return path[len(pwd) + 1:]
+            path = path[len(pwd) + 1:]
+        if "/site-packages/" in path:  # tox install the package in general
+            path = path.split("/site-packages/")[1]
         return path
 
     def format_test_function_location(item):
