@@ -1,4 +1,5 @@
 import os
+import json
 import pytest
 
 from _pytest.recwarn import WarningsRecorder
@@ -59,12 +60,28 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
             print("%s\n-> %s:%s %s('%s')" % (format_test_function_location(warning.item), cut_path(warning.filename), warning.lineno, warning.category.__name__, warning.message))
 
         print("")
-        print("All DeprecationWarning errors can be found in the deprecated_warnings.log file.")
+        print("All DeprecationWarning errors can be found in the deprecated_warnings.json file.")
 
-        with open("deprecated_warnings.log", "w") as f:
-            for warning in clean_duplicated(all_deprecated_warnings):
-                f.write("%s\n-> %s:%s %s('%s')\n" % (format_test_function_location(warning.item), cut_path(warning.filename), warning.lineno, warning.category.__name__, warning.message))
+        warnings_as_json = []
+
+        for warning in all_deprecated_warnings:
+            serialized_warning = {x: str(getattr(warning.message, x)) for x in dir(warning.message) if not x.startswith("__")}
+
+            serialized_warning.update({
+                "lineno": warning.lineno,
+                "category": warning.category.__name__,
+                "path": warning.filename,
+                "filename": cut_path(warning.filename),
+                "test_file": warning.item.location[0],
+                "test_lineno": warning.item.location[1],
+                "test_name": warning.item.location[2],
+            })
+
+            warnings_as_json.append(serialized_warning)
+
+        with open("deprecated_warnings.json", "w") as f:
+            f.write(json.dumps(warnings_as_json, indent=4, sort_keys=True))
     else:
         # nothing, clear file
-        with open("deprecated_warnings.log", "w") as f:
+        with open("deprecated_warnings.json", "w") as f:
             f.write("")
