@@ -71,6 +71,21 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
         return "%s::%s:%s" % (item.location[0], item.location[2], item.location[1])
 
     yield
+
+    # try to grab tox env name because tox don't give it
+    for test in terminalreporter.stats.get("passed", []) + terminalreporter.stats.get("failed", []):
+        if ".tox" in test.location[0]:
+            tox_env_name = test.location[0].split(".tox/")[1].split("/")[0]
+            output_file_name = f"{tox_env_name}-deprecated-warnings.json"
+            break
+    else:
+        for warning in terminalreporter.stats.get("warnings", []):
+            tox_env_name = warning.fslocation[0].split(".tox/")[1].split("/")[0]
+            output_file_name = f"{tox_env_name}-deprecated-warnings.json"
+            break
+        else:
+            output_file_name = "deprecated-warnings.json"
+
     if all_deprecated_warnings:
         print("")
         print("Deprecated warnings summary:")
@@ -79,7 +94,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
             print("%s\n-> %s:%s %s('%s')" % (format_test_function_location(warning.item), cut_path(warning.filename), warning.lineno, warning.category.__name__, warning.message))
 
         print("")
-        print("All DeprecationWarning errors can be found in the deprecated_warnings.json file.")
+        print(f"All DeprecationWarning errors can be found in the {output_file_name} file.")
 
         warnings_as_json = []
 
@@ -99,9 +114,9 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
 
             warnings_as_json.append(serialized_warning)
 
-        with open("deprecated_warnings.json", "w") as f:
+        with open(output_file_name, "w") as f:
             f.write(json.dumps(warnings_as_json, indent=4, sort_keys=True))
     else:
         # nothing, clear file
-        with open("deprecated_warnings.json", "w") as f:
+        with open(output_file_name, "w") as f:
             f.write("")
