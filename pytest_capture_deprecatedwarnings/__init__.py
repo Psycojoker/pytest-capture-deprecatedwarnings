@@ -31,12 +31,12 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
         seen = set()
 
         for warning in all_deprecated_warnings:
-            triplet = (warning.filename, warning.lineno, warning.category)
+            quadruplet = (warning.filename, warning.lineno, warning.category, str(warning.message))
 
-            if triplet in seen:
+            if quadruplet in seen:
                 continue
 
-            seen.add(triplet)
+            seen.add(quadruplet)
             cleaned_list.append(warning)
 
         return sorted(cleaned_list, key=lambda x: (x.filename, x.lineno))
