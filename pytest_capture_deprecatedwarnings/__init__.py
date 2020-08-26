@@ -41,6 +41,20 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
 
         return sorted(cleaned_list, key=lambda x: (x.filename, x.lineno))
 
+    def count_appereance(all_deprecated_warnings):
+        counted = {}
+
+        for warning in all_deprecated_warnings:
+            quadruplet = (warning.filename, warning.lineno, warning.category, str(warning.message))
+
+            if quadruplet in counted:
+                counted[quadruplet].count += 1
+            else:
+                warning.count = 1
+                counted[quadruplet] = warning
+
+        return counted.values()
+
     pwd = os.path.realpath(os.curdir)
 
     def cut_path(path):
@@ -64,10 +78,11 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
 
         warnings_as_json = []
 
-        for warning in all_deprecated_warnings:
+        for warning in count_appereance(all_deprecated_warnings):
             serialized_warning = {x: str(getattr(warning.message, x)) for x in dir(warning.message) if not x.startswith("__")}
 
             serialized_warning.update({
+                "count": warning.count,
                 "lineno": warning.lineno,
                 "category": warning.category.__name__,
                 "path": warning.filename,
