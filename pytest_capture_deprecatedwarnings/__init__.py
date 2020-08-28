@@ -112,6 +112,9 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
                 "test_name": warning.item.location[2],
             })
 
+            if "with_traceback" in serialized_warning:
+                del serialized_warning["with_traceback"]
+
             warnings_as_json.append(serialized_warning)
 
         with open(output_file_name, "w") as f:
