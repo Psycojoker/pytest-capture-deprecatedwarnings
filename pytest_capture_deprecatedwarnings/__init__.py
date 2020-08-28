@@ -119,6 +119,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
 
         with open(output_file_name, "w") as f:
             f.write(json.dumps(warnings_as_json, indent=4, sort_keys=True))
+            f.write("\n")
     else:
         # nothing, clear file
         with open(output_file_name, "w") as f:
