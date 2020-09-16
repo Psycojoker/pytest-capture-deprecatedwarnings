@@ -76,12 +76,12 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
     for test in terminalreporter.stats.get("passed", []) + terminalreporter.stats.get("failed", []):
         if ".tox" in test.location[0]:
             tox_env_name = test.location[0].split(".tox/")[1].split("/")[0]
-            output_file_name = f"{tox_env_name}-deprecated-warnings.json"
+            output_file_name = "%s-deprecated-warnings.json" % tox_env_name
             break
     else:
         for warning in terminalreporter.stats.get("warnings", []):
             tox_env_name = warning.fslocation[0].split(".tox/")[1].split("/")[0]
-            output_file_name = f"{tox_env_name}-deprecated-warnings.json"
+            output_file_name = "%s-deprecated-warnings.json" % tox_env_name
             break
         else:
             output_file_name = "deprecated-warnings.json"
@@ -94,7 +94,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
             print("%s\n-> %s:%s %s('%s')" % (format_test_function_location(warning.item), cut_path(warning.filename), warning.lineno, warning.category.__name__, warning.message))
 
         print("")
-        print(f"All DeprecationWarning errors can be found in the {output_file_name} file.")
+        print("All DeprecationWarning errors can be found in the %s file." % output_file_name)
 
         warnings_as_json = []
 
