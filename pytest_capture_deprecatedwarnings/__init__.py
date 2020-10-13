@@ -74,15 +74,16 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
 
     # try to grab tox env name because tox don't give it
     for test in terminalreporter.stats.get("passed", []) + terminalreporter.stats.get("failed", []):
-        if ".tox" in test.location[0]:
+        if ".tox/" in test.location[0]:
             tox_env_name = test.location[0].split(".tox/")[1].split("/")[0]
             output_file_name = "%s-deprecated-warnings.json" % tox_env_name
             break
     else:
         for warning in terminalreporter.stats.get("warnings", []):
-            tox_env_name = warning.fslocation[0].split(".tox/")[1].split("/")[0]
-            output_file_name = "%s-deprecated-warnings.json" % tox_env_name
-            break
+            if ".tox/" in warning.fslocation[0]:
+                tox_env_name = warning.fslocation[0].split(".tox/")[1].split("/")[0]
+                output_file_name = "%s-deprecated-warnings.json" % tox_env_name
+                break
         else:
             output_file_name = "deprecated-warnings.json"
 
