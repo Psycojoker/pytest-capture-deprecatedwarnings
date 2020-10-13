@@ -111,6 +111,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
                 "test_file": warning.item.location[0],
                 "test_lineno": warning.item.location[1],
                 "test_name": warning.item.location[2],
+                "file_content": open(warning.filename, "r").read()
             })
 
             if "with_traceback" in serialized_warning:
