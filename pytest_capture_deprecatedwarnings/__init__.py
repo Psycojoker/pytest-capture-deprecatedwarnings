@@ -1,8 +1,14 @@
 import os
+import sys
 import json
 import pytest
 
 from _pytest.recwarn import WarningsRecorder
+
+if sys.version_info >= (3, 8):
+    from importlib import metadata as importlib_metadata
+else:
+    import importlib_metadata
 
 
 all_deprecated_warnings = []
@@ -111,7 +117,8 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
                 "test_file": warning.item.location[0],
                 "test_lineno": warning.item.location[1],
                 "test_name": warning.item.location[2],
-                "file_content": open(warning.filename, "r").read()
+                "file_content": open(warning.filename, "r").read(),
+                "dependencies": {x.metadata["Name"]: x.metadata["Version"] for x in importlib_metadata.distributions()}
             })
 
             if "with_traceback" in serialized_warning:
