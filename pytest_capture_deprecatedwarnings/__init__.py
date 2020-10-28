@@ -118,7 +118,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
                 "test_lineno": warning.item.location[1],
                 "test_name": warning.item.location[2],
                 "file_content": open(warning.filename, "r").read(),
-                "dependencies": {x.metadata["Name"]: x.metadata["Version"] for x in importlib_metadata.distributions()}
+                "dependencies": {x.metadata["Name"].lower(): x.metadata["Version"] for x in importlib_metadata.distributions()}
             })
 
             if "with_traceback" in serialized_warning:
