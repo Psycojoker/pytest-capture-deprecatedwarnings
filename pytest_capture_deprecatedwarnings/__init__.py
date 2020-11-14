@@ -141,6 +141,12 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
         for warning in count_appereance(all_deprecated_warnings):
             serialized_warning = {x: str(getattr(warning.message, x)) for x in dir(warning.message) if not x.startswith("__")}
 
+            stack_item = warning.traceback[-1]
+            while stack_item.filename != warning.filename and stack_item.lineno != warning.lineno:
+                warning.traceback.pop()
+                warning.formatted_traceback.pop()
+                stack_item = warning.traceback[-1]
+
             serialized_warning.update({
                 "count": warning.count,
                 "lineno": warning.lineno,
