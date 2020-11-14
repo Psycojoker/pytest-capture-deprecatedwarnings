@@ -2,6 +2,8 @@ import os
 import sys
 import json
 import pytest
+import warnings
+import traceback
 
 from _pytest.recwarn import WarningsRecorder
 
@@ -14,6 +16,25 @@ else:
 all_deprecated_warnings = []
 
 
+def showwarning_with_traceback(message, category, filename, lineno, file=None, line=None):
+    msg = warnings.WarningMessage(message, category, filename, lineno, file, line)
+
+    msg.formatted_traceback = traceback.format_stack()
+    msg.traceback = traceback.extract_stack()
+
+    warnings._showwarnmsg_impl(msg)
+
+
+def formatwarning_with_traceback(message, category, filename, lineno, line=None):
+    """Function to format a warning the standard way."""
+    msg = warnings.WarningMessage(message, category, filename, lineno, None, line)
+
+    msg.formatted_traceback = traceback.format_stack()
+    msg.traceback = traceback.extract_stack()
+
+    return warnings._formatwarnmsg_impl(msg)
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_call(item):
     """
@@ -22,8 +43,20 @@ def pytest_runtest_call(item):
     warnings_recorder = WarningsRecorder()
     warnings_recorder._module.simplefilter('once')
 
-    with warnings_recorder:
-        yield
+    default_formatwarning = warnings_recorder._module.formatwarning
+    default_showwarning = warnings_recorder._module.showwarning
+
+    warnings_recorder.__enter__()
+
+    warnings_recorder._module.formatwarning = formatwarning_with_traceback
+    warnings_recorder._module.showwarning = showwarning_with_traceback
+
+    yield
+
+    warnings_recorder._module.formatwarning = default_formatwarning
+    warnings_recorder._module.showwarning = default_showwarning
+
+    warnings_recorder.__exit__(None, None, None)
 
     deprecated_warnings = [x for x in warnings_recorder.list if "DeprecationWarning" in x._category_name]
 
