@@ -5,7 +5,7 @@ from setuptools import setup
 
 
 setup(name="pytest-capture-deprecatedwarnings",
-      version='0.3',
+      version='0.4',
       author='Laurent Peuch',
       author_email='cortex@worlddomination.be',
       url='https://github.com/psycojoker/pytest-capture-deprecatedwarnings',
