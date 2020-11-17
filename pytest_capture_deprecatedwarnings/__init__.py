@@ -22,7 +22,10 @@ def showwarning_with_traceback(message, category, filename, lineno, file=None, l
     msg.formatted_traceback = traceback.format_stack()
     msg.traceback = traceback.extract_stack()
 
-    warnings._showwarnmsg_impl(msg)
+    if hasattr(warnings, "_showwarnmsg_impl"):
+        warnings._showwarnmsg_impl(msg)
+    else:  # python 2
+        warnings._show_warning(message, category, filename, lineno, file, line)
 
 
 def formatwarning_with_traceback(message, category, filename, lineno, line=None):
@@ -32,7 +35,10 @@ def formatwarning_with_traceback(message, category, filename, lineno, line=None)
     msg.formatted_traceback = traceback.format_stack()
     msg.traceback = traceback.extract_stack()
 
-    return warnings._formatwarnmsg_impl(msg)
+    if hasattr(warnings, "_formatwarnmsg_impl"):
+        return warnings._formatwarnmsg_impl(msg)
+    else:
+        return warnings.default_formatwarning(message, category, filename, lineno, line)
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -48,13 +54,17 @@ def pytest_runtest_call(item):
 
     warnings_recorder.__enter__()
 
-    warnings_recorder._module.formatwarning = formatwarning_with_traceback
     warnings_recorder._module.showwarning = showwarning_with_traceback
+    warnings_recorder._module.formatwarning = formatwarning_with_traceback
+    if not hasattr(warnings_recorder._module, "_formatwarnmsg_impl"):
+        warnings_recorder._module.default_formatwarning = default_formatwarning
 
     yield
 
     warnings_recorder._module.formatwarning = default_formatwarning
     warnings_recorder._module.showwarning = default_showwarning
+    if not hasattr(warnings_recorder._module, "_formatwarnmsg_impl"):
+        del warnings_recorder._module.default_formatwarning
 
     warnings_recorder.__exit__(None, None, None)
 
