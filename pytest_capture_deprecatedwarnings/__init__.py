@@ -160,7 +160,10 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
             serialized_traceback = []
             for x in warning.traceback:
                 serialized_frame = {key: getattr(x, key) for key in dir(x) if not key.startswith("_")}
-                serialized_frame["file_content"] = open(serialized_frame["filename"]).read()
+                if os.path.exists(serialized_frame["filename"]):
+                    serialized_frame["file_content"] = open(serialized_frame["filename"]).read()
+                else:
+                    serialized_frame["file_content"] = None
                 serialized_frame["filename"] = cut_path(serialized_frame["filename"])
                 serialized_traceback.append(serialized_frame)
 
