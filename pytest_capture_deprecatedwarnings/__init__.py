@@ -157,6 +157,13 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
                 warning.formatted_traceback.pop()
                 stack_item = warning.traceback[-1]
 
+            serialized_traceback = []
+            for x in warning.traceback:
+                serialized_frame = {key: getattr(x, key) for key in dir(x) if not key.startswith("_")}
+                serialized_frame["file_content"] = open(serialized_frame["filename"]).read()
+                serialized_frame["filename"] = cut_path(serialized_frame["filename"])
+                serialized_traceback.append(serialized_frame)
+
             serialized_warning.update({
                 "count": warning.count,
                 "lineno": warning.lineno,
@@ -169,7 +176,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
                 "file_content": open(warning.filename, "r").read(),
                 "dependencies": {x.metadata["Name"].lower(): x.metadata["Version"] for x in importlib_metadata.distributions()},
                 "formatted_traceback": "".join(warning.formatted_traceback),
-                "traceback": [{key: getattr(x, key) for key in dir(x) if not key.startswith("_")} for x in warning.traceback],
+                "traceback": serialized_traceback,
             })
 
             if "with_traceback" in serialized_warning:
