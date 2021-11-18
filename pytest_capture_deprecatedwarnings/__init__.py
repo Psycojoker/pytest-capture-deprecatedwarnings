@@ -73,7 +73,8 @@ def pytest_runtest_call(item):
     for i in deprecated_warnings:
         i.item = item
 
-    all_deprecated_warnings.extend(deprecated_warnings)
+    if deprecated_warnings:
+        all_deprecated_warnings.extend(deprecated_warnings)
 
 
 @pytest.hookimpl(hookwrapper=True)
