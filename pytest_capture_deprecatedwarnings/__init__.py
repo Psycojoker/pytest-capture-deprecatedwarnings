@@ -13,7 +13,7 @@ else:
     import importlib_metadata
 
 
-all_deprecated_warnings = []
+counted_warnings = {}
 
 
 def showwarning_with_traceback(message, category, filename, lineno, file=None, line=None):
@@ -68,46 +68,23 @@ def pytest_runtest_call(item):
 
     warnings_recorder.__exit__(None, None, None)
 
-    deprecated_warnings = [x for x in warnings_recorder.list if "DeprecationWarning" in x._category_name]
+    for warning in warnings_recorder.list:
+        if "DeprecationWarning" not in warning._category_name:
+            continue
 
-    for i in deprecated_warnings:
-        i.item = item
+        warning.item = item
+        quadruplet = (warning.filename, warning.lineno, warning.category, str(warning.message))
 
-    if deprecated_warnings:
-        all_deprecated_warnings.extend(deprecated_warnings)
+        if quadruplet in counted_warnings:
+            counted_warnings[quadruplet].count += 1
+            continue
+        else:
+            warning.count = 1
+            counted_warnings[quadruplet] = warning
 
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
-    def clean_duplicated(all_deprecated_warnings):
-        cleaned_list = []
-        seen = set()
-
-        for warning in all_deprecated_warnings:
-            quadruplet = (warning.filename, warning.lineno, warning.category, str(warning.message))
-
-            if quadruplet in seen:
-                continue
-
-            seen.add(quadruplet)
-            cleaned_list.append(warning)
-
-        return sorted(cleaned_list, key=lambda x: (x.filename, x.lineno))
-
-    def count_appereance(all_deprecated_warnings):
-        counted = {}
-
-        for warning in all_deprecated_warnings:
-            quadruplet = (warning.filename, warning.lineno, warning.category, str(warning.message))
-
-            if quadruplet in counted:
-                counted[quadruplet].count += 1
-            else:
-                warning.count = 1
-                counted[quadruplet] = warning
-
-        return counted.values()
-
     pwd = os.path.realpath(os.curdir)
 
     def cut_path(path):
@@ -137,11 +114,11 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
         else:
             output_file_name = "deprecated-warnings.json"
 
-    if all_deprecated_warnings:
+    if counted_warnings:
         print("")
         print("Deprecated warnings summary:")
         print("============================")
-        for warning in clean_duplicated(all_deprecated_warnings):
+        for warning in sorted(counted_warnings.values(), key=lambda x: (x.filename, x.lineno)):
             print("%s\n-> %s:%s %s('%s')" % (format_test_function_location(warning.item), cut_path(warning.filename), warning.lineno, warning.category.__name__, warning.message))
 
         print("")
@@ -149,7 +126,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
 
         warnings_as_json = []
 
-        for warning in count_appereance(all_deprecated_warnings):
+        for warning in counted_warnings.values():
             serialized_warning = {x: str(getattr(warning.message, x)) for x in dir(warning.message) if not x.startswith("__")}
 
             saved_traceback = warning.traceback[:]
