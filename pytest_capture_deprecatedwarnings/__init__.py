@@ -1,8 +1,10 @@
 import os
 import sys
+import gzip
 import json
 import pytest
 import warnings
+import tempfile
 import traceback
 
 from _pytest.recwarn import WarningsRecorder
@@ -14,6 +16,18 @@ else:
 
 
 all_deprecated_warnings = []
+seen_warnings = set()
+
+_deprecated_warnings_dump_dir = tempfile.TemporaryDirectory()
+print(_deprecated_warnings_dump_dir.name)
+_deprecated_warnings_dump_count = 0
+pwd = os.path.realpath(os.curdir)
+serialized_metadata = {x.metadata["Name"].lower(): x.metadata["Version"] for x in importlib_metadata.distributions()}
+
+
+open("/tmp/aze", "a").write(f"\n\n\n\n")
+def log(msg):
+    open("/tmp/aze", "a").write(f"{msg}\n")
 
 
 def showwarning_with_traceback(message, category, filename, lineno, file=None, line=None):
@@ -39,6 +53,110 @@ def formatwarning_with_traceback(message, category, filename, lineno, line=None)
         return warnings._formatwarnmsg_impl(msg)
     else:
         return warnings.default_formatwarning(message, category, filename, lineno, line)
+
+
+def store_deprecated_warnings(deprecated_warnings):
+    log(f"total number of warnings BEFORE DEDUPLICATION: {len(all_deprecated_warnings)} deprecated warnings")
+    qsd = []
+    for warning in deprecated_warnings:
+        quadruplet = (warning.filename, warning.lineno, warning.category.__name__, str(warning.message))
+        if quadruplet in seen_warnings:
+            continue
+        seen_warnings.add(quadruplet)
+
+        log(f"serialize {quadruplet}")
+        qsd.append(serialize_warning(warning))
+
+    deprecated_warnings = qsd
+
+    all_deprecated_warnings.extend(deprecated_warnings)
+    log(f"stored {len(deprecated_warnings)} deprecated warnings")
+    log(f"total number of warnings: {len(all_deprecated_warnings)} deprecated warnings")
+
+    if len(all_deprecated_warnings) > 1000:
+        global _deprecated_warnings_dump_count
+        _deprecated_warnings_dump_count += 1
+        with gzip.open(f"{_deprecated_warnings_dump_dir.name}/deprecated_warnings_chunk-{_deprecated_warnings_dump_count:07}.json.gzip", "w") as f:
+            json.dump(all_deprecated_warnings, f)
+
+        log(">>> drop a chunck of deprecated warnings <<<")
+        all_deprecated_warnings[:] = []
+
+
+def serialize_warning(warning):
+    saved_traceback = warning.traceback[:]
+
+    stack_item = warning.traceback[-1]
+    while stack_item.filename != warning.filename and stack_item.lineno != warning.lineno:
+        warning.traceback.pop()
+        warning.formatted_traceback.pop()
+        if warning.traceback:
+            stack_item = warning.traceback[-1]
+        else:  # we failed to find the line from which the warning is coming
+            warning.traceback = saved_traceback
+            break
+
+    serialized_traceback = []
+    for x in warning.traceback:
+        serialized_frame = {key: getattr(x, key) for key in dir(x) if not key.startswith("_")}
+        if os.path.exists(serialized_frame["filename"]):
+            serialized_frame["file_content"] = open(serialized_frame["filename"]).read()
+        else:
+            serialized_frame["file_content"] = None
+        serialized_frame["filename"] = cut_path(serialized_frame["filename"])
+        serialized_traceback.append(serialized_frame)
+
+    serialized_warning = {x: str(getattr(warning.message, x)) for x in dir(warning.message) if not x.startswith("__")}
+
+    serialized_warning.update({
+        "lineno": warning.lineno,
+        "category": warning.category.__name__,
+        "path": warning.filename,
+        "filename": cut_path(warning.filename),
+        "test_file": warning.item.location[0],
+        "test_lineno": warning.item.location[1],
+        "test_name": warning.item.location[2],
+        "file_content": open(warning.filename, "r").read(),
+        "dependencies": serialized_metadata,
+        "formatted_traceback": "".join(warning.formatted_traceback),
+        "traceback": serialized_traceback,
+    })
+
+    if "with_traceback" in serialized_warning:
+        del serialized_warning["with_traceback"]
+
+    return serialized_warning
+
+
+def get_stored_deprecated_warnings():
+    for chunck_file in sorted(os.listdir(_deprecated_warnings_dump_dir.name)):
+        if not chunck_file.startswith("deprecated_warnings_chunk"):
+            continue
+
+        with gzip.open(f"{_deprecated_warnings_dump_dir.name}/{chunck_file}", "r") as f:
+            for i in json.load(f):
+                yield i
+
+    for i in all_deprecated_warnings:
+        yield i
+
+
+def has_deprecated_warnings():
+    if all_deprecated_warnings:
+        return True
+
+    if any(i for i in os.listdir(_deprecated_warnings_dump_dir.name) if i.startswith("deprecated_warnings_chunk")):
+        return True
+
+    return False
+
+
+def cut_path(path):
+    if path.startswith(pwd):
+        path = path[len(pwd) + 1:]
+    if "/site-packages/" in path:  # tox install the package in general
+        path = path.split("/site-packages/")[1]
+    return path
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -74,7 +192,7 @@ def pytest_runtest_call(item):
         i.item = item
 
     if deprecated_warnings:
-        all_deprecated_warnings.extend(deprecated_warnings)
+        store_deprecated_warnings(deprecated_warnings)
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -84,7 +202,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
         seen = set()
 
         for warning in all_deprecated_warnings:
-            quadruplet = (warning.filename, warning.lineno, warning.category, str(warning.message))
+            quadruplet = (warning["filename"], warning["lineno"], warning["category"], warning["message"])
 
             if quadruplet in seen:
                 continue
@@ -98,24 +216,15 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
         counted = {}
 
         for warning in all_deprecated_warnings:
-            quadruplet = (warning.filename, warning.lineno, warning.category, str(warning.message))
+            quadruplet = (warning["filename"], warning["lineno"], warning["category"], warning["message"])
 
             if quadruplet in counted:
                 counted[quadruplet].count += 1
             else:
-                warning.count = 1
+                warning["count"] = 1
                 counted[quadruplet] = warning
 
         return counted.values()
-
-    pwd = os.path.realpath(os.curdir)
-
-    def cut_path(path):
-        if path.startswith(pwd):
-            path = path[len(pwd) + 1:]
-        if "/site-packages/" in path:  # tox install the package in general
-            path = path.split("/site-packages/")[1]
-        return path
 
     def format_test_function_location(item):
         return "%s::%s:%s" % (item.location[0], item.location[2], item.location[1])
@@ -137,62 +246,20 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
         else:
             output_file_name = "deprecated-warnings.json"
 
-    if all_deprecated_warnings:
+    if has_deprecated_warnings():
         print("")
         print("Deprecated warnings summary:")
         print("============================")
-        for warning in clean_duplicated(all_deprecated_warnings):
-            print("%s\n-> %s:%s %s('%s')" % (format_test_function_location(warning.item), cut_path(warning.filename), warning.lineno, warning.category.__name__, warning.message))
+        for warning in clean_duplicated(get_stored_deprecated_warnings()):
+            print("%s\n-> %s:%s %s('%s')" % (format_test_function_location(warning["item"]), cut_path(warning["filename"]), warning["lineno"], warning["category"], warning["message"]))
 
         print("")
         print("All DeprecationWarning errors can be found in the %s file." % output_file_name)
 
         warnings_as_json = []
 
-        for warning in count_appereance(all_deprecated_warnings):
-            serialized_warning = {x: str(getattr(warning.message, x)) for x in dir(warning.message) if not x.startswith("__")}
-
-            saved_traceback = warning.traceback[:]
-
-            stack_item = warning.traceback[-1]
-            while stack_item.filename != warning.filename and stack_item.lineno != warning.lineno:
-                warning.traceback.pop()
-                warning.formatted_traceback.pop()
-                if warning.traceback:
-                    stack_item = warning.traceback[-1]
-                else:  # we failed to find the line from which the warning is coming
-                    warning.traceback = saved_traceback
-                    break
-
-            serialized_traceback = []
-            for x in warning.traceback:
-                serialized_frame = {key: getattr(x, key) for key in dir(x) if not key.startswith("_")}
-                if os.path.exists(serialized_frame["filename"]):
-                    serialized_frame["file_content"] = open(serialized_frame["filename"]).read()
-                else:
-                    serialized_frame["file_content"] = None
-                serialized_frame["filename"] = cut_path(serialized_frame["filename"])
-                serialized_traceback.append(serialized_frame)
-
-            serialized_warning.update({
-                "count": warning.count,
-                "lineno": warning.lineno,
-                "category": warning.category.__name__,
-                "path": warning.filename,
-                "filename": cut_path(warning.filename),
-                "test_file": warning.item.location[0],
-                "test_lineno": warning.item.location[1],
-                "test_name": warning.item.location[2],
-                "file_content": open(warning.filename, "r").read(),
-                "dependencies": {x.metadata["Name"].lower(): x.metadata["Version"] for x in importlib_metadata.distributions()},
-                "formatted_traceback": "".join(warning.formatted_traceback),
-                "traceback": serialized_traceback,
-            })
-
-            if "with_traceback" in serialized_warning:
-                del serialized_warning["with_traceback"]
-
-            warnings_as_json.append(serialized_warning)
+        for warning in count_appereance(get_stored_deprecated_warnings()):
+            warnings_as_json.append(warning)
 
         with open(output_file_name, "w") as f:
             f.write(json.dumps(warnings_as_json, indent=4, sort_keys=True))
@@ -201,3 +268,6 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
         # nothing, clear file
         with open(output_file_name, "w") as f:
             f.write("")
+
+    global _deprecated_warnings_dump_dir
+    del _deprecated_warnings_dump_dir
