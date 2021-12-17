@@ -47,7 +47,7 @@ def pytest_runtest_call(item):
     Needed to grab the item.location information
     """
     warnings_recorder = WarningsRecorder()
-    warnings_recorder._module.simplefilter('once')
+    warnings_recorder._module.simplefilter('default')
 
     default_formatwarning = warnings_recorder._module.formatwarning
     default_showwarning = warnings_recorder._module.showwarning
