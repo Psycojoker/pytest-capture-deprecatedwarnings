@@ -14,6 +14,9 @@ else:
 
 
 counted_warnings = {}
+warnings_recorder = WarningsRecorder()
+default_formatwarning = warnings_recorder._module.formatwarning
+default_showwarning = warnings_recorder._module.showwarning
 
 
 def showwarning_with_traceback(message, category, filename, lineno, file=None, line=None):
@@ -46,10 +49,7 @@ def pytest_runtest_call(item):
     """
     Needed to grab the item.location information
     """
-    warnings_recorder = WarningsRecorder()
-
-    default_formatwarning = warnings_recorder._module.formatwarning
-    default_showwarning = warnings_recorder._module.showwarning
+    global warnings_recorder
 
     warnings_recorder.__enter__()
 
