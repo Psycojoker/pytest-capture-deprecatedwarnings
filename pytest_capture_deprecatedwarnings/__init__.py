@@ -50,6 +50,9 @@ def pytest_runtest_call(item):
     Needed to grab the item.location information
     """
     global warnings_recorder
+    if os.environ.get("PYTHONWARNINGS") == "ignore":
+        yield
+        return
 
     warnings_recorder.__enter__()
 
