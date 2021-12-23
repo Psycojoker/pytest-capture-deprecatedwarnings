@@ -68,6 +68,28 @@ def pytest_runtest_call(item):
     warnings_recorder.__exit__(None, None, None)
 
     for warning in warnings_recorder.list:
+        # this code is adapted from python official warnings module
+
+        # Search the filters
+        for filter in warnings.filters:
+            action, msg, cat, mod, ln = filter
+
+            module = warning.filename or "<unknown>"
+            if module[-3:].lower() == ".py":
+                module = module[:-3] # XXX What about leading pathname?
+
+            if ((msg is None or msg.match(warning.message)) and
+                issubclass(warning.category, cat) and
+                (mod is None or mod.match(module)) and
+                (ln == 0 or warning.lineno == ln)):
+                break
+        else:
+            action = warnings.defaultaction
+
+        # Early exit actions
+        if action == "ignore":
+            continue
+
         if "DeprecationWarning" not in warning._category_name:
             continue
 
