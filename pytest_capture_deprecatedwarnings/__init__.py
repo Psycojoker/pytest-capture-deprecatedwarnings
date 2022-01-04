@@ -81,7 +81,7 @@ def pytest_runtest_call(item):
             if module[-3:].lower() == ".py":
                 module = module[:-3] # XXX What about leading pathname?
 
-            if ((msg is None or msg.match(warning.message)) and
+            if ((msg is None or msg.match(str(warning.message))) and
                 issubclass(warning.category, cat) and
                 (mod is None or mod.match(module)) and
                 (ln == 0 or warning.lineno == ln)):
