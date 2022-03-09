@@ -199,8 +199,8 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
                 "test_name": warning.item.location[2],
                 "file_content": open(warning.filename, "r").read(),
                 "dependencies": dependencies,
-                "distribution": get_distribution_from_file_path(warning.filename).name,
-                # "distribution_metadata": get_distribution_from_file_path(warning.filename).json,
+                "outdated_package": get_distribution_from_file_path(warning.filename).name,
+                # "outdated_package_metadata": get_distribution_from_file_path(warning.filename).json,
                 "formatted_traceback": "".join(warning.formatted_traceback),
                 "traceback": serialized_traceback,
             })
