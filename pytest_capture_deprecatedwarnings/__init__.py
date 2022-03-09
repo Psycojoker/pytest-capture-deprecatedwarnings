@@ -121,9 +121,9 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
     def format_test_function_location(item):
         return "%s::%s:%s" % (item.location[0], item.location[2], item.location[1])
 
-    def get_distribution_from_file_path(file_path):
-        all_packagepath = sum([distribution.files for distribution in importlib_metadata.Distribution().discover()], [])
+    all_packagepath = sum([distribution.files for distribution in importlib_metadata.Distribution().discover()], [])
 
+    def get_distribution_from_file_path(file_path):
         files_that_match = [packagepath for packagepath in all_packagepath if file_path.endswith(str(packagepath))]
 
         if not files_that_match:
