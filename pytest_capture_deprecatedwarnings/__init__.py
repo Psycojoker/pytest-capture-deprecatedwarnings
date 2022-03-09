@@ -121,6 +121,17 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
     def format_test_function_location(item):
         return "%s::%s:%s" % (item.location[0], item.location[2], item.location[1])
 
+    def get_distribution_from_file_path(file_path):
+        all_packagepath = sum([distribution.files for distribution in importlib_metadata.Distribution().discover()], [])
+
+        files_that_match = [packagepath for packagepath in all_packagepath if file_path.endswith(str(packagepath))]
+
+        if not files_that_match:
+            return None
+
+        # in case there is several matches opt for the longuest one
+        return sorted(files_that_match, key=lambda x: len(str(x)))[0].dist
+
     yield
 
     # try to grab tox env name because tox don't give it
@@ -186,6 +197,8 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
                 "test_name": warning.item.location[2],
                 "file_content": open(warning.filename, "r").read(),
                 "dependencies": {x.metadata["Name"].lower(): x.metadata["Version"] for x in importlib_metadata.distributions()},
+                "distribution": get_distribution_from_file_path(warning.filename).name,
+                # "distribution_metadata": get_distribution_from_file_path(warning.filename).json,
                 "formatted_traceback": "".join(warning.formatted_traceback),
                 "traceback": serialized_traceback,
             })
