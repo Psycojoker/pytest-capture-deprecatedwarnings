@@ -134,6 +134,8 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
 
     yield
 
+    dependencies = {x.metadata["Name"].lower(): x.metadata["Version"] for x in importlib_metadata.distributions()}
+
     # try to grab tox env name because tox don't give it
     for test in terminalreporter.stats.get("passed", []) + terminalreporter.stats.get("failed", []):
         if ".tox/" in test.location[0]:
@@ -196,7 +198,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
                 "test_lineno": warning.item.location[1],
                 "test_name": warning.item.location[2],
                 "file_content": open(warning.filename, "r").read(),
-                "dependencies": {x.metadata["Name"].lower(): x.metadata["Version"] for x in importlib_metadata.distributions()},
+                "dependencies": dependencies,
                 "distribution": get_distribution_from_file_path(warning.filename).name,
                 # "distribution_metadata": get_distribution_from_file_path(warning.filename).json,
                 "formatted_traceback": "".join(warning.formatted_traceback),
