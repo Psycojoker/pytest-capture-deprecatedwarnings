@@ -130,7 +130,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
             return None
 
         # in case there is several matches opt for the longuest one
-        return sorted(files_that_match, key=lambda x: len(str(x)))[0].dist
+        return sorted(files_that_match, key=lambda x: len(str(x)))[0].dist.name
 
     yield
 
@@ -199,7 +199,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
                 "test_name": warning.item.location[2],
                 "file_content": open(warning.filename, "r").read(),
                 "dependencies": dependencies,
-                "outdated_package": get_distribution_from_file_path(warning.filename).name,
+                "outdated_package": get_distribution_from_file_path(warning.filename),
                 # "outdated_package_metadata": get_distribution_from_file_path(warning.filename).json,
                 "formatted_traceback": "".join(warning.formatted_traceback),
                 "traceback": serialized_traceback,
