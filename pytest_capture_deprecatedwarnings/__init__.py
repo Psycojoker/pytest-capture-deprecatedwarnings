@@ -121,19 +121,14 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
     def format_test_function_location(item):
         return "%s::%s:%s" % (item.location[0], item.location[2], item.location[1])
 
-    all_packagepath = []
-    for distribution in importlib_metadata.Distribution().discover():
+    _cached_path_to_package = {}
+    # mypy fails to understand the result of .discover(): Cannot
+    # instantiate abstract class 'Distribution' with abstract attributes
+    # 'locate_file' and 'read_text'
+    for distribution in importlib_metadata.Distribution().discover():  # type: ignore
         if distribution.files:
-            all_packagepath += distribution.files
-
-    def get_distribution_from_file_path(file_path):
-        files_that_match = [packagepath for packagepath in all_packagepath if file_path.endswith(str(packagepath))]
-
-        if not files_that_match:
-            return None
-
-        # in case there is several matches opt for the longuest one
-        return sorted(files_that_match, key=lambda x: len(str(x)))[0].dist.name
+            for file in distribution.files:
+                _cached_path_to_package[str(distribution.locate_file(file))] = distribution.name
 
     yield
 
@@ -202,7 +197,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
                 "test_name": warning.item.location[2],
                 "file_content": open(warning.filename, "r").read(),
                 "dependencies": dependencies,
-                "outdated_package": get_distribution_from_file_path(warning.filename),
+                "outdated_package": _cached_path_to_package.get(warning.filename),
                 # "outdated_package_metadata": get_distribution_from_file_path(warning.filename).json,
                 "formatted_traceback": "".join(warning.formatted_traceback),
                 "traceback": serialized_traceback,
