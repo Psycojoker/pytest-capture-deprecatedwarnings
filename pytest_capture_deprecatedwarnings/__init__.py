@@ -135,7 +135,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
     # instantiate abstract class 'Distribution' with abstract attributes
     # 'locate_file' and 'read_text'
     for distribution in importlib_metadata.Distribution().discover():  # type: ignore
-        if distribution.files:
+        if distribution.files and hasattr(distribution, "name"):
             for file in distribution.files:
                 _cached_path_to_package[
                     str(distribution.locate_file(file))
