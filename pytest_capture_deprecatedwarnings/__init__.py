@@ -26,9 +26,17 @@ def showwarning_with_traceback(
 ):
     msg = warnings.WarningMessage(message, category, filename, lineno, file, line)
 
-    formatted_traceback = traceback.format_stack()
-    msg_traceback = traceback.extract_stack()
-    warning_to_tracebacks[msg] = serialize_traceback(msg_traceback, formatted_traceback, msg)
+    quadruplet = (
+        msg.filename,
+        msg.lineno,
+        msg.category,
+        str(msg.message),
+    )
+
+    if quadruplet not in warning_to_tracebacks:
+        formatted_traceback = traceback.format_stack()
+        msg_traceback = traceback.extract_stack()
+        warning_to_tracebacks[quadruplet] = serialize_traceback(msg_traceback, formatted_traceback, msg)
 
     if hasattr(warnings, "_showwarnmsg_impl"):
         warnings._showwarnmsg_impl(msg)
@@ -40,9 +48,17 @@ def formatwarning_with_traceback(message, category, filename, lineno, line=None)
     """Function to format a warning the standard way."""
     msg = warnings.WarningMessage(message, category, filename, lineno, None, line)
 
-    formatted_traceback = traceback.format_stack()
-    msg_traceback = traceback.extract_stack()
-    warning_to_tracebacks[msg] = serialize_traceback(msg_traceback, formatted_traceback, msg)
+    quadruplet = (
+        msg.filename,
+        msg.lineno,
+        msg.category,
+        str(msg.message),
+    )
+
+    if quadruplet not in warning_to_tracebacks:
+        formatted_traceback = traceback.format_stack()
+        msg_traceback = traceback.extract_stack()
+        warning_to_tracebacks[quadruplet] = serialize_traceback(msg_traceback, formatted_traceback, msg)
 
     if hasattr(warnings, "_formatwarnmsg_impl"):
         return warnings._formatwarnmsg_impl(msg)
@@ -113,14 +129,14 @@ def pytest_runtest_call(item):
         )
 
         if quadruplet in counted_warnings:
-            counted_warnings[quadruplet].count += 1
+            counted_warnings[quadruplet][0].count += 1
             continue
         else:
             warning.count = 1
-            serialized_traceback, formatted_traceback = warning_to_tracebacks[warning]
+            serialized_traceback, formatted_traceback = warning_to_tracebacks[quadruplet]
             counted_warnings[quadruplet] = warning, serialized_traceback, formatted_traceback
 
-        del warning_to_tracebacks[warning]
+        del warning_to_tracebacks[quadruplet]
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -167,8 +183,8 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
         print("")
         print("Deprecated warnings summary:")
         print("============================")
-        for warning in sorted(
-            counted_warnings.values(), key=lambda x: (x.filename, x.lineno)
+        for warning, _, _ in sorted(
+            counted_warnings.values(), key=lambda x: (x[0].filename, x[0].lineno)
         ):
             print(
                 "%s\n-> %s:%s %s('%s')"
