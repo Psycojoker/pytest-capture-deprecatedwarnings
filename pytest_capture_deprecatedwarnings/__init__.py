@@ -18,14 +18,17 @@ warnings_recorder = WarningsRecorder()
 default_formatwarning = warnings_recorder._module.formatwarning
 default_showwarning = warnings_recorder._module.showwarning
 
+warning_to_tracebacks = {}
+
 
 def showwarning_with_traceback(
     message, category, filename, lineno, file=None, line=None
 ):
     msg = warnings.WarningMessage(message, category, filename, lineno, file, line)
 
-    msg.formatted_traceback = traceback.format_stack()
-    msg.traceback = traceback.extract_stack()
+    formatted_traceback = traceback.format_stack()
+    msg_traceback = traceback.extract_stack()
+    warning_to_tracebacks[msg] = serialize_traceback(msg_traceback, formatted_traceback, msg)
 
     if hasattr(warnings, "_showwarnmsg_impl"):
         warnings._showwarnmsg_impl(msg)
@@ -37,8 +40,9 @@ def formatwarning_with_traceback(message, category, filename, lineno, line=None)
     """Function to format a warning the standard way."""
     msg = warnings.WarningMessage(message, category, filename, lineno, None, line)
 
-    msg.formatted_traceback = traceback.format_stack()
-    msg.traceback = traceback.extract_stack()
+    formatted_traceback = traceback.format_stack()
+    msg_traceback = traceback.extract_stack()
+    warning_to_tracebacks[msg] = serialize_traceback(msg_traceback, formatted_traceback, msg)
 
     if hasattr(warnings, "_formatwarnmsg_impl"):
         return warnings._formatwarnmsg_impl(msg)
@@ -113,20 +117,14 @@ def pytest_runtest_call(item):
             continue
         else:
             warning.count = 1
-            counted_warnings[quadruplet] = warning
+            serialized_traceback, formatted_traceback = warning_to_tracebacks[warning]
+            counted_warnings[quadruplet] = warning, serialized_traceback, formatted_traceback
+
+        del warning_to_tracebacks[warning]
 
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
-    pwd = os.path.realpath(os.curdir)
-
-    def cut_path(path):
-        if path.startswith(pwd):
-            path = path[len(pwd) + 1 :]
-        if "/site-packages/" in path:  # tox install the package in general
-            path = path.split("/site-packages/")[1]
-        return path
-
     def format_test_function_location(item):
         return "%s::%s:%s" % (item.location[0], item.location[2], item.location[1])
 
@@ -191,41 +189,12 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
 
         warnings_as_json = []
 
-        for warning in counted_warnings.values():
+        for warning, serialized_traceback, formatted_traceback in counted_warnings.values():
             serialized_warning = {
                 x: str(getattr(warning.message, x))
                 for x in dir(warning.message)
                 if not x.startswith("__")
             }
-
-            saved_traceback = warning.traceback[:]
-
-            stack_item = warning.traceback[-1]
-            while (
-                stack_item.filename != warning.filename
-                and stack_item.lineno != warning.lineno
-            ):
-                warning.traceback.pop()
-                warning.formatted_traceback.pop()
-                if warning.traceback:
-                    stack_item = warning.traceback[-1]
-                else:  # we failed to find the line from which the warning is coming
-                    warning.traceback = saved_traceback
-                    break
-
-            serialized_traceback = []
-            for x in warning.traceback:
-                serialized_frame = {
-                    key: getattr(x, key) for key in dir(x) if not key.startswith("_")
-                }
-                if os.path.exists(serialized_frame["filename"]):
-                    serialized_frame["file_content"] = open(
-                        serialized_frame["filename"]
-                    ).read()
-                else:
-                    serialized_frame["file_content"] = None
-                serialized_frame["filename"] = cut_path(serialized_frame["filename"])
-                serialized_traceback.append(serialized_frame)
 
             serialized_warning.update(
                 {
@@ -241,7 +210,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
                     "dependencies": dependencies,
                     "outdated_package": _cached_path_to_package.get(warning.filename),
                     # "outdated_package_metadata": get_distribution_from_file_path(warning.filename).json,
-                    "formatted_traceback": "".join(warning.formatted_traceback),
+                    "formatted_traceback": "".join(formatted_traceback),
                     "traceback": serialized_traceback,
                 }
             )
@@ -258,3 +227,45 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
         # nothing, clear file
         with open(output_file_name, "w") as f:
             f.write("")
+
+
+def serialize_traceback(traceback, formatted_traceback, warning):
+    saved_traceback = traceback[:]
+
+    stack_item = traceback[-1]
+    while (
+        stack_item.filename != warning.filename
+        and stack_item.lineno != warning.lineno
+    ):
+        traceback.pop()
+        formatted_traceback.pop()
+        if traceback:
+            stack_item = traceback[-1]
+        else:  # we failed to find the line from which the warning is coming
+            traceback = saved_traceback
+            break
+
+    serialized_traceback = []
+    for x in traceback:
+        serialized_frame = {
+            key: getattr(x, key) for key in dir(x) if not key.startswith("_")
+        }
+        if os.path.exists(serialized_frame["filename"]):
+            with open(serialized_frame["filename"]) as f:
+                serialized_frame["file_content"] = f.read()
+        else:
+            serialized_frame["file_content"] = None
+        serialized_frame["filename"] = cut_path(serialized_frame["filename"])
+        serialized_traceback.append(serialized_frame)
+
+    return serialized_traceback, formatted_traceback
+
+
+def cut_path(path):
+    pwd = os.path.realpath(os.curdir)
+
+    if path.startswith(pwd):
+        path = path[len(pwd) + 1 :]
+    if "/site-packages/" in path:  # tox install the package in general
+        path = path.split("/site-packages/")[1]
+    return path
