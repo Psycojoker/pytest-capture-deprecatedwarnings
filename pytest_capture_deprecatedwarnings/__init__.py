@@ -20,6 +20,8 @@ default_showwarning = warnings_recorder._module.showwarning
 
 warning_to_tracebacks = {}
 
+os.environ["COLLECT_DEPRECATION_WARNINGS_PACKAGE_NAME"] = "True"
+
 
 def showwarning_with_traceback(
     message, category, filename, lineno, file=None, line=None
