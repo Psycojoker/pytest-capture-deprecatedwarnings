@@ -23,6 +23,15 @@ warning_to_tracebacks = {}
 os.environ["COLLECT_DEPRECATION_WARNINGS_PACKAGE_NAME"] = "True"
 
 
+class FakeDistribution(importlib_metadata.Distribution):
+    "see https://github.com/python/importlib_metadata/blob/main/CHANGES.rst#v600"
+    def locate_file(self):
+        pass
+
+    def read_text(self):
+        pass
+
+
 def showwarning_with_traceback(
     message, category, filename, lineno, file=None, line=None
 ):
@@ -150,7 +159,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
     # mypy fails to understand the result of .discover(): Cannot
     # instantiate abstract class 'Distribution' with abstract attributes
     # 'locate_file' and 'read_text'
-    for distribution in importlib_metadata.Distribution().discover():  # type: ignore
+    for distribution in FakeDistribution().discover():  # type: ignore
         if distribution.files and hasattr(distribution, "name"):
             for file in distribution.files:
                 _cached_path_to_package[

@@ -15,5 +15,5 @@ setup(name="pytest-capture-deprecatedwarnings",
       license="MIT",
       packages=['pytest_capture_deprecatedwarnings'],
       entry_points={'pytest11': ['pytest_capture_deprecatedwarnings = pytest_capture_deprecatedwarnings']},
-      install_requires=['pytest', 'importlib_metadata'],
+      install_requires=['pytest', 'importlib_metadata>=6.0.0,<7.0.0'],
       )
