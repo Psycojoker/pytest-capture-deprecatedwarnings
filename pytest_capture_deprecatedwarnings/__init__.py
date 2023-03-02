@@ -236,7 +236,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config=None):
                     "test_file": warning.item.location[0],
                     "test_lineno": warning.item.location[1],
                     "test_name": warning.item.location[2],
-                    "file_content": open(warning.filename, "r").read(),
+                    "file_content": open(warning.filename, "r").read() if os.path.exists(warning.filename) else str(warning.filename),
                     "dependencies": dependencies,
                     "outdated_package": _cached_path_to_package.get(warning.filename),
                     # "outdated_package_metadata": get_distribution_from_file_path(warning.filename).json,
